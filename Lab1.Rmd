@@ -54,9 +54,7 @@ pumpkins %>% slice_head(n = 5)
 ```
 
 ```{r}
-
 ## Load lubridate
-
 library(lubridate)
 
 # Extract the month and day from the dates and add as new columns
@@ -69,8 +67,8 @@ pumpkins %>%
 
 
 ## View the first few rows
-
 pumpkins %>% slice_head(n = 7)
+
 ```
 
 There are two column dealing with price, high and low. Let's combine them into a single average price column.
@@ -78,7 +76,7 @@ There are two column dealing with price, high and low. Let's combine them into a
 ```{r}
 # Create a new column price
 pumpkins <- pumpkins %>% 
-  mutate(price = (low_price+ high_price)/2)
+  mutate(price = (low_price + high_price)/2)
 ```
 
 Let's take a look at pumpkins sales throughout the year.
@@ -87,6 +85,8 @@ Let's take a look at pumpkins sales throughout the year.
 
 ```{r}
 
+ggplot(pumpkins, aes(x=day, y=price)) +
+  geom_point()
 
 ```
 
@@ -110,6 +110,8 @@ Pumpkins seem to be very hard to weigh consistently, so let's filter them by sel
 ```{r}
 # Retain only pumpkins with "bushel" in the package column
 
+new_pumpkins <- pumpkins |> 
+  filter(str_detect(package, "bushel"))
 
 # Get the dimensions of the new data
 dim(new_pumpkins)
@@ -117,6 +119,7 @@ dim(new_pumpkins)
 # View a few rows of the new data
 new_pumpkins %>% 
   slice_head(n = 10)
+
 ```
 
 You can see that we have narrowed down to 415 rows of data containing pumpkins by the bushel.
@@ -143,7 +146,6 @@ new_pumpkins %>%
 ## Data Visualization
 
 ```{r}
-
 # Set theme
 theme_set(theme_light())
 
@@ -164,10 +166,23 @@ Hint: use dplyr::group_by() %>% summarize()
 ```{r}
 # Find the average price of pumpkins per month
 
+new_pumpkins |> 
+  group_by(month) |> 
+  summarise(mean = mean(price))
+
 ```
+
 *Question 5:* Now do that again, but continue on and plot the results with a bar plot 
 ```{r}
 # Find the average price of pumpkins per month then plot a bar chart
+
+new_pumpkins |> 
+  group_by(month) |> 
+  summarise(mean = mean(price)) |> 
+  ggplot(aes(x=month, y = mean)) +
+  geom_col(fill = "darkblue", alpha = 0.5, color = "darkblue") +
+  labs(title = "Average Price of Pumpkins",
+       subtitle= "Per month")
 
 ```
 
@@ -179,7 +194,7 @@ Machine learning models work best with numeric features rather than text values,
 
 This means that we have to find a way to reformat our predictors to make them easier for a model to use effectively, a process known as **feature engineering**.
 
-Different models have different preprocessing requirements. For instance, least squares requires encoding categorical variables such as month, variety and city_name. This simply involves translating a column with categorical values into one or more numeric columns that take the place of the original.
+Different models have different pre-processing requirements. For instance, least squares requires encoding categorical variables such as month, variety and city_name. This simply involves translating a column with categorical values into one or more numeric columns that take the place of the original.
 
 Now let's introduce another useful Tidymodels package: recipes - which will help you preprocess data before training your mode. A recipe is an object that defines what steps should be applied to a data set in order to get it ready for modelling.
 
@@ -193,6 +208,7 @@ pumpkins_recipe <- recipe(price ~ ., data = new_pumpkins) %>%
 
 # Print out the recipe
 pumpkins_recipe
+
 ```
 
 OK, we created our first recipe that specifies an outcome (price) and its corresponding predictors and that all the predictor columns should be encoded into a set of integers. Let's quickly break it down:
@@ -223,9 +239,11 @@ baked_pumpkins %>%
   slice_head(n = 10)
 ```
 
-The processed data baked_pumpkins has all its predictors encoded confirming that indeed the preprocessing steps defined as our recipe will work as expected. This makes it harder for you to read but more intelligible for tidymodels. Take a look at how the observations have been mapped to numbers.
+The processed data baked_pumpkins has all its predictors encoded confirming that indeed the pre-processing steps defined as our recipe will work as expected. This makes it harder for you to read but more intelligible for tidymodels. Take a look at how the observations have been mapped to numbers.
 
 *Question 6:* From looking at the baked_pumpkins tibble, how many total cities are represented in the data set?
+
+*Repsonse: Ten unique cities are within the new table of baked_pumpkins.*
 
 baked_pumpkins is a data frame that we can perform computations on. For instance, let's try to find a good correlation between two variables to potentially build a good predictive model. We'll use the function cor() to do this.
 
@@ -237,10 +255,14 @@ cor(baked_pumpkins$package, baked_pumpkins$price)
 *Question 7:* Calculate the correlation between pumpkin price and two other variables in the data set
 
 ```{r}
+names(baked_pumpkins)
+cor(baked_pumpkins$variety, baked_pumpkins$price)
+cor(baked_pumpkins$day, baked_pumpkins$price)
 
 ```
 
-*Question 8:* Which of these three variables is most highly correlated with price? Why might this be?
+*Question 8:* Which of these three variables is most highly correlated with price? Why might this be? 
+*Response: The most correlated variable is the package one, as the other two have a negative correlation.*
 
 Now let's visualize a correlation matrix of all the columns using the corrplot package.
 
@@ -254,7 +276,14 @@ corr_mat <- cor(baked_pumpkins %>%
                   select(-c(low_price, high_price)))
 
 # Make a correlation plot between the variables
-corrplot(corr_mat, method = "shade", shade.col = NA, tl.col = "black", tl.srt = 45, addCoef.col = "black", cl.pos = "n", order = "original")
+corrplot(corr_mat, 
+         method = "shade", 
+         shade.col = NA, 
+         tl.col = "black", 
+         tl.srt = 45, 
+         addCoef.col = "black", 
+         cl.pos = "n", 
+         order = "original")
 
 ```
 
@@ -264,10 +293,11 @@ Now that we have build a recipe, and actually confirmed that the data will be pr
 
 #Train a linear regression model using the training set As you may have already figured out, the column price is the outcome variable while the package column is the predictor variable.
 
-To do this, we'll first split the data. Data splitting is a key part of the machine learning process. For now we'll do a 80/2o split, where 80% of the data goes into training and 20% into the test set. Then we'll define a recipe that will encode the predictor column into a set of integers, then build a model specification. We won't prep and bake our recipe since we already know it will preprocess the data as expected.
+To do this, we'll first split the data. Data splitting is a key part of the machine learning process. For now we'll do a 80/20 split, where 80% of the data goes into training and 20% into the test set. Then we'll define a recipe that will encode the predictor column into a set of integers, then build a model specification. We won't prep and bake our recipe since we already know it will preprocess the data as expected.
 
 ```{r}
 set.seed(123)
+
 # Split the data into training and test sets
 pumpkins_split <- new_pumpkins %>% 
   initial_split(prop = 0.8)
@@ -278,7 +308,7 @@ pumpkins_train <- training(pumpkins_split)
 pumpkins_test <- testing(pumpkins_split)
 
 
-# Create a recipe for preprocessing the data
+# Create a recipe for pre processing the data
 lm_pumpkins_recipe <- recipe(price ~ package, data = pumpkins_train) %>% 
   step_integer(all_predictors(), zero_based = TRUE)
 
@@ -390,5 +420,6 @@ plot_results %>%
 Hmm. The model does not do good job of generalizing the relationship between a package and its corresponding price.
 
 *Question 9* What issues do you see with fitting a linear regression to this data?
+*Response: Having the package data as a character data could be a complicated way to fit linear regression.*
 
 Congratulations, you just created a model that can help predict the price of a few varieties of pumpkins. But you can probably create a better model!
