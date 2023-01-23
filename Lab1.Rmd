@@ -2,7 +2,9 @@
 title: "Lab1"
 author: "Javier Patron"
 date: "`r Sys.Date()`"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -17,13 +19,12 @@ library("here")
 dat <- read_csv(here::here("pumpkin-data.csv"))
 ```
 
-##Case Study: The Pumpkin Market
-The data you just loaded  includes 1757 lines of data about the market for pumpkins, sorted into groupings by city. This is raw data extracted from the Specialty Crops Terminal Markets Standard Reports distributed by the United States Department of Agriculture.
+## Case Study: The Pumpkin Market
+The data you just loaded includes 1757 lines of data about the market for pumpkins, sorted into groupings by city. This is raw data extracted from the Specialty Crops Terminal Markets Standard Reports distributed by the United States Department of Agriculture.
 
 You are loading a pumpkin data set so as to ask questions of it.
 
 When is the best time to buy pumpkins?
-
 What price can I expect of a case of miniature pumpkins?
 
 Should I buy them in half-bushel baskets or by the 1 1/9 bushel box?
@@ -83,10 +84,10 @@ Let's take a look at pumpkins sales throughout the year.
 
 *Question 1:* Create a scatter plot using price on the y-axis and day on the x-axis.
 
-```{r}
+```{r echo = TRUE}
 
 ggplot(pumpkins, aes(x=day, y=price)) +
-  geom_point()
+  geom_point(alpha = 0.5)
 
 ```
 
@@ -96,10 +97,11 @@ That's right: pumpkins are sold in many different configurations. Some are sold 
 
 Let's verify this:
 
-```{r}
+```{r echo = TRUE}
 # Verify the distinct observations in Package column
 pumpkins %>% 
   distinct(package)
+
 ```
 
 Pumpkins seem to be very hard to weigh consistently, so let's filter them by selecting only pumpkins with the string bushel in the package column and put this in a new data frame "new_pumpkins".
@@ -107,7 +109,7 @@ Pumpkins seem to be very hard to weigh consistently, so let's filter them by sel
 *Question 2* In the first section of the chunk below, use a combination of dplyr::filter() and stringr::str_detect() to achieve what we want.
 
 
-```{r}
+```{r, echo = TRUE}
 # Retain only pumpkins with "bushel" in the package column
 
 new_pumpkins <- pumpkins |> 
@@ -155,7 +157,8 @@ new_pumpkins %>%
   geom_point(size = 1.6)
 ```
 
-*Question 3:* Is this a useful plot 🤷? Does anything about it surprise you?
+*Question 3:* Is this a useful plot? Does anything about it surprise you?
+*Response: It doesn´t seem like a useful plot as its hard to see the differences in the all the pumpkin categories. There is a trend of one type of pumpkin that is sold all year long (question 1), but most of the other ones are just sold around the ~250 day of the year.*
 
 How do we make it useful? To get charts to display useful data, you usually need to group the data somehow.
 
@@ -163,7 +166,7 @@ How do we make it useful? To get charts to display useful data, you usually need
 
 Hint: use dplyr::group_by() %>% summarize()
 
-```{r}
+```{r echo = TRUE}
 # Find the average price of pumpkins per month
 
 new_pumpkins |> 
@@ -173,20 +176,20 @@ new_pumpkins |>
 ```
 
 *Question 5:* Now do that again, but continue on and plot the results with a bar plot 
-```{r}
-# Find the average price of pumpkins per month then plot a bar chart
 
+```{r}
 new_pumpkins |> 
   group_by(month) |> 
   summarise(mean = mean(price)) |> 
   ggplot(aes(x=month, y = mean)) +
   geom_col(fill = "darkblue", alpha = 0.5, color = "darkblue") +
   labs(title = "Average Price of Pumpkins",
-       subtitle= "Per month")
-
+       subtitle= "Per month",
+       y = "Mean Price")
 ```
 
-#Preprocessing data for modelling using recipes
+
+# Preprocessing data for modelling using recipes
 
 What if we wanted to predict the price of a pumpkin based on the city or package columns which are of type character? How could we find the correlation between, say, package and price?
 
@@ -227,7 +230,7 @@ bake(): takes a prepped recipe and applies the operations to any data set.
 
 Now let's prep and bake our recipes to confirm that under the hood, the predictor columns will be first encoded before a model is fit.
 
-```{r}
+```{r echo = TRUE}
 # Prep the recipe
 pumpkins_prep <- prep(pumpkins_recipe)
 
@@ -243,7 +246,7 @@ The processed data baked_pumpkins has all its predictors encoded confirming that
 
 *Question 6:* From looking at the baked_pumpkins tibble, how many total cities are represented in the data set?
 
-*Repsonse: Ten unique cities are within the new table of baked_pumpkins.*
+*Response: Ten unique cities are within the new table of baked_pumpkins.*
 
 baked_pumpkins is a data frame that we can perform computations on. For instance, let's try to find a good correlation between two variables to potentially build a good predictive model. We'll use the function cor() to do this.
 
@@ -254,7 +257,7 @@ cor(baked_pumpkins$package, baked_pumpkins$price)
 
 *Question 7:* Calculate the correlation between pumpkin price and two other variables in the data set
 
-```{r}
+```{r echo = TRUE}
 names(baked_pumpkins)
 cor(baked_pumpkins$variety, baked_pumpkins$price)
 cor(baked_pumpkins$day, baked_pumpkins$price)
@@ -262,11 +265,11 @@ cor(baked_pumpkins$day, baked_pumpkins$price)
 ```
 
 *Question 8:* Which of these three variables is most highly correlated with price? Why might this be? 
-*Response: The most correlated variable is the package one, as the other two have a negative correlation.*
+*Response: The most correlated variable is the package one, as the other two have a negative correlation. This is predictable because the bigger the packages the bigger the price. The other variables can affect the price, but the main one is the size of the package*.
 
 Now let's visualize a correlation matrix of all the columns using the corrplot package.
 
-```{r}
+```{r }
 # Load the corrplot package
 library(corrplot)
 
@@ -291,7 +294,7 @@ corrplot(corr_mat,
 
 Now that we have build a recipe, and actually confirmed that the data will be pre-processed appropriately, let's now build a regression model to answer the question: What price can I expect of a given pumpkin package?
 
-#Train a linear regression model using the training set As you may have already figured out, the column price is the outcome variable while the package column is the predictor variable.
+# Train a linear regression model using the training set As you may have already figured out, the column price is the outcome variable while the package column is the predictor variable.
 
 To do this, we'll first split the data. Data splitting is a key part of the machine learning process. For now we'll do a 80/20 split, where 80% of the data goes into training and 20% into the test set. Then we'll define a recipe that will encode the predictor column into a set of integers, then build a model specification. We won't prep and bake our recipe since we already know it will preprocess the data as expected.
 
@@ -357,7 +360,6 @@ Let's start with making predictions for the test set then bind the columns to th
 predictions <- lm_wf_fit %>% 
   predict(new_data = pumpkins_test)
 
-
 # Bind predictions to the test set
 lm_results <- pumpkins_test %>% 
   select(c(package, price)) %>% 
@@ -420,6 +422,6 @@ plot_results %>%
 Hmm. The model does not do good job of generalizing the relationship between a package and its corresponding price.
 
 *Question 9* What issues do you see with fitting a linear regression to this data?
-*Response: Having the package data as a character data could be a complicated way to fit linear regression.*
+*Response: As we changed the package type to discrete numbers the line doesn't fit very well with this conditions. Additionally there are other variables that are highly correlated to the price like variety, which we are not taking it into consideration within this graph.*
 
 Congratulations, you just created a model that can help predict the price of a few varieties of pumpkins. But you can probably create a better model!
