@@ -5,6 +5,17 @@ date: "2023-01-18"
 output: pdf_document
 ---
 
+
+
+Adding the information from Lab1
+```{r}
+# Source from lab 1
+sourceDir <- "/Users/javipatron/Documents/MEDS/Courses/eds232/labs/eds232-lab1/Lab1.Rmd"
+library(knitr)
+source(knitr::purl(sourceDir, quiet=TRUE))
+```
+
+
 Today we will be continuing the pumpkin case study from last week. We will be using the data that you cleaned and split last time (pumpkins_train) and will be comparing our results today to those you have already obtained, so open and run your Lab 1 .Rmd as a first step so those objects are available in your Environment (unless you created an R Project last time, in which case, kudos to you!).  
 
 Once you have done that, we'll start today's lab by specifying a recipe for a polynomial model.  First we specify a recipe that identifies our variables and data, converts package to a numerical form, and then add a polynomial effect with step_poly()
@@ -17,7 +28,9 @@ poly_pumpkins_recipe <-
   step_poly(all_predictors(), degree = 4)
 ```
 
-How did that work? Choose another value for degree if you need to. Later we will learn about model tuning that will let us do things like find the optimal value for degree.  For now, we'd like to have a flexible model, so find the highest value for degree that is consistent with our data.
+How did that work? Choose another value for degree if you need to. Later we will learn about model tuning that will let us do things like find the optimal value for degree.  For now, we'd like to have a flexible model, so find the highest value for degree that is consistent with our data. 
+*Degree = 4; The degree of 4 means we will have a polynomial of level 4 to make it very compatible to the data set. The only bad side about it is that we may overfit our model. * 
+$$ax^4 + bx^3 + cx^2 + dx + e  = 0$$
 
 Polynomial regression is still linear regression, so our model specification looks similar to before.
 
@@ -51,7 +64,6 @@ poly_wf_fit <- poly_wf |>
 ```{r}
 # Print learned model coefficients
 poly_wf_fit
-
 ```
 
 
@@ -66,6 +78,7 @@ poly_results <- poly_wf_fit %>%
 # Print the results
 poly_results %>% 
   slice_head(n = 10)
+
 ```
 
 Now let's evaluate how the model performed on the test_set using yardstick::metrics().
@@ -77,7 +90,7 @@ metrics_poly <- metrics(data = poly_results, truth = price, estimate = .pred)
 print("Linear Regression Metrics:")
 metrics_linear
 
-print("Polynomial  Metrics:")
+print("Polynomial Metrics:")
 metrics_poly
 
 ```
@@ -117,7 +130,12 @@ my_formula <- price ~ package
 poly_results %>% ggplot(aes(x=package_integer)) +
   geom_point(aes(y = price), color = "blue") +
   geom_point(aes(y=.pred), color = "red") +
-  geom_line(aes(y=.pred), color = "gray30")
+  geom_line(aes(y=.pred), color = "gray30") +
+  labs(title = "Pumpkins price per Package",
+       subtitle = "Linear model",
+       caption = "Package column (x axis) is factor mode",
+       x = "Package (Integer)",
+       y = "Price ($$$)")
 
 ```
 
@@ -129,36 +147,120 @@ geom_smooth(method = lm, formula = y ~ poly(x, degree = 3), color = "midnightblu
 ```{r}
 # Make a smoother scatter plot 
 
-my_formula = y ~ poly(x,degree = 3)
+poly_formula = y ~ poly(x,degree = 3)
 
 poly_results %>% ggplot(aes(x= package_integer, y = price)) +
   geom_point(aes(y = price), color = "red") +
   geom_point(aes(y = .pred), color = "blue") +
   geom_smooth(method = lm,
-              formula = my_formula,
-              color = "gray25",
-              se= F)
+              formula = poly_formula,
+              color = "gray35",
+              se= F)  +
+  labs(title = "Pumpkins price per Package",
+       subtitle = "Polynomial model",
+       caption = "Polynomial Degree 3",
+       x = "Package (Integer)",
+       y = "Price ($$$)")
 ```
 
 OK, now it's your turn to go through the process one more time.
  
 Additional assignment components :
 6. Choose  a new predictor variable (anything not involving package type) in this data set.
+
+*Response: The new pedictor variable im gonna choose is the varierty, because it has a strong correlation and we can fit the model with less degree´s. We should be careful by not overfitting the model.*
 7. Determine its correlation with the outcome variable (price).  (Remember we calculated a correlation matrix last week)
+
+```{r}
+# Question 7
+# Find the correlation between the variety and the price
+cor(baked_pumpkins$variety, baked_pumpkins$price)
+```
+
 8. Create and test a model for your new predictor:
   - Create a recipe
-  - Build a model specification (linear or polynomial)
-  - Bundle the recipe and model specification into a workflow
-  - Create a model by fitting the workflow
-  - Evaluate model performance on the test data
-  - Create a visualization of model performance
-  
   
 ```{r}
+my_recipe <- recipe(data = pumpkins_train, price ~variety) |> # Selecting the the new variety feature from the training df
+  step_integer(all_predictors(), zero_based = T) |> # creating all the predictors (outcome) as integers.
+  step_poly(all_predictors(), degree = 2) #setting the polynomial degree spec
+```
+  
+  - Build a model specification (linear or polynomial)
+```{r}
+
+my_poly_spececification <- linear_reg() %>% 
+  set_engine("lm") %>% 
+  set_mode("regression")
+
+```
+  
+  - Bundle the recipe and model specification into a workflow
+```{r}
+my_workflow <- workflow() |>
+add_recipe( my_recipe ) |>
+add_model( my_poly_spececification )
+
+```
+  
+  - Create a model by fitting the workflow
+```{r}
+
+my_workflow_fit <- my_workflow |> 
+  fit(data = pumpkins_train)
+
+my_results <- my_workflow_fit |> 
+  predict(new_data = pumpkins_test) |> 
+  bind_cols(pumpkins_test |> 
+              select(c(variety, price))) |> 
+  relocate(.pred, .after = price)
+
+```
+  
+  - Evaluate model performance on the test data
+  
+```{r}
+my_evaluation <- metrics(data = my_results,
+                         truth = price,
+                         estimate = .pred)
+
+```
+  
+  - Create a visualization of model performance
+```{r}
+
+my_lm_recipe <- recipe(data = pumpkins_train, price ~variety) |> # Selecting the the new variety feature from the training df
+  step_integer(all_predictors(), zero_based = T)
+# Bind encoded package column to the results
+
+variety_encode <- my_lm_recipe %>% 
+  prep() %>% 
+  bake(new_data = pumpkins_test) %>% 
+  select(variety)
+
+my_plotting_results <- my_results %>% 
+  bind_cols(variety_encode %>% 
+              rename(variety_integer = variety))
 
 
+my_formula <- y ~ poly(x, degree = 2)
+
+ggplot(my_plotting_results, aes(x= variety_integer, y = price)) +
+  geom_point(aes(y = price), col = "#6e7f80") +
+  geom_point(aes(y=.pred), col = "red", size = 2) +
+   geom_smooth(method = lm,
+               formula = my_formula,
+               color = "coral", 
+               size = .5, 
+               se = FALSE) +
+  labs(title = "Pumpkins price per Variety",
+       subtitle = "Polynomial model",
+       caption = "Polynomial Degree 2",
+       x = "Variety (Integer)",
+       y = "Price ($$$)")
 
 ```
 
-  
+
+
 Lab 2 due 1/24 at 11:59 PM
